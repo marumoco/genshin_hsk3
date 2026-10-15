@@ -14,8 +14,9 @@
   <meta name="apple-mobile-web-app-title" content="HSK3リーダー">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <!-- Tailwind CSS & Google Fonts -->
+  <!-- Tailwind CSS & Google Fonts & Puter.js (Cloud TTS Fallback) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.puter.com/v2/"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -464,30 +465,27 @@
         if (fallbackStarted) return;
         fallbackStarted = true;
         
-        // 第2候補: 有道辞書音声
-        const fallbackAudio = new Audio();
-        fallbackAudio.referrerPolicy = "no-referrer";
-        fallbackAudio.onended = () => {
-          currentAudio = null;
-          setAudioStatus(false);
-          if (onComplete) onComplete();
-        };
-        fallbackAudio.onerror = () => {
-          currentAudio = null;
-          fallbackSpeechSynthesis(cleanText, lang, onComplete);
-        };
-        fallbackAudio.src = "https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(cleanText) + "&le=zh";
-        const fp = fallbackAudio.play();
-        if (fp !== undefined) {
-          fp.catch((err) => {
-            if (err.name === "NotAllowedError") {
-              showAudioNotice("⚠️ 音声再生がブロックされています。アドレスバー左のアイコンから許可してください");
+        // 第2候補: Puter.js クラウド中国語音声 (CORS/ORBエラーなし)
+        if (typeof puter !== 'undefined' && puter.ai && puter.ai.txt2speech) {
+          puter.ai.txt2speech(cleanText, "zh-CN").then((fallbackAudio) => {
+            currentAudio = fallbackAudio;
+            fallbackAudio.onended = () => {
+              currentAudio = null;
               setAudioStatus(false);
               if (onComplete) onComplete();
-            } else {
-              fallbackAudio.onerror();
-            }
+            };
+            fallbackAudio.onerror = () => {
+              currentAudio = null;
+              fallbackSpeechSynthesis(cleanText, lang, onComplete);
+            };
+            fallbackAudio.play().catch(() => fallbackAudio.onerror());
+          }).catch(() => {
+            currentAudio = null;
+            fallbackSpeechSynthesis(cleanText, lang, onComplete);
           });
+        } else {
+          currentAudio = null;
+          fallbackSpeechSynthesis(cleanText, lang, onComplete);
         }
       };
 
