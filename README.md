@@ -1,4 +1,4 @@
-# HSK3級 完全制覇リーダー 
+# HSK3級 原神風　chrome推奨！！！
 
 HSK3級の単語・例文を効率よく学習できるPWA（Progressive Web App）対応のWebリーダーです。
 
