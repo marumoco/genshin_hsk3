@@ -1,4 +1,6 @@
-const CACHE_NAME = 'hsk3-reader-v2';
+const CACHE_NAME = 'hsk3-reader-v4';
+const AUDIO_CACHE_NAME = 'hsk3-audio-cache-v1';
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -25,7 +27,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          // アプリキャッシュのみ古いバージョンを削除。音声キャッシュ(AUDIO_CACHE_NAME)は永続保持
+          if (key !== CACHE_NAME && key !== AUDIO_CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -35,7 +38,30 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation or asset fallback
+  const url = event.request.url;
+
+  // 1. Google TTS 音声の自動キャッシュ（Cache-First: 一度聞いた音声は端末内に保存し、オフラインでも即座に再生）
+  if (url.includes('translate.google.com/translate_tts') || url.includes('dictvoice')) {
+    event.respondWith(
+      caches.open(AUDIO_CACHE_NAME).then((audioCache) => {
+        return audioCache.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(event.request).then((networkResponse) => {
+            // クロスオリジン音声(opaque)または正常レスポンスをキャッシュに保存
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+              audioCache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. 通常のアセット（HTML, JS, 画像など）のキャッシュ処理
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

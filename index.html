@@ -379,58 +379,20 @@
       }
     }
 
-    // 音声読み上げ（Web Speech API: 中国語ネイティブ音声）
-    function getChineseVoice() {
-      if (!('speechSynthesis' in window)) return null;
-      const voices = window.speechSynthesis.getVoices();
-      return voices.find(v => v.lang === 'zh-CN' || v.lang === 'zh_CN') ||
-             voices.find(v => (v.lang.toLowerCase().includes('zh') || v.lang.toLowerCase().includes('cmn')) && !v.lang.toLowerCase().includes('ja')) ||
-             voices.find(v => v.name.toLowerCase().includes('chinese') || v.name.includes('国语') || v.name.includes('普通话') || v.name.includes('中文')) ||
-             null;
-    }
+    let currentAudio = null;
 
-    function speak(text) {
+    function speak(text, lang = 'zh-CN') {
       if (!text) return;
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
       if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
       ttsQueue = [];
-      playSingleTTS(text, () => setAudioStatus(false));
-    }
-
-    function playSingleTTS(text, onComplete) {
-      if (!('speechSynthesis' in window)) {
-        if (onComplete) onComplete();
-        return;
-      }
-      window.speechSynthesis.cancel();
-      setAudioStatus(true);
-
-      const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
-      const ut = new SpeechSynthesisUtterance(cleanText);
-      ut.lang = 'zh-CN';
-      ut.rate = 0.85;
-
-      const zhVoice = getChineseVoice();
-      if (zhVoice) ut.voice = zhVoice;
-
-      let finished = false;
-      const finish = () => {
-        if (!finished) {
-          finished = true;
-          setAudioStatus(false);
-          if (onComplete) onComplete();
-        }
-      };
-
-      ut.onend = finish;
-      ut.onerror = finish;
-
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(ut);
+      playSingleTTS(text, lang, () => setAudioStatus(false));
     }
 
     function playSceneTTS(sceneId) {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
       if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
-      if (typeof storyChapters === 'undefined') return;
+      
       const chapter = storyChapters.find(c => c.id === currentChapter);
       if (!chapter) return;
       const scene = chapter.scenes.find(s => s.id === sceneId);
@@ -457,7 +419,70 @@
         return;
       }
       const text = ttsQueue.shift();
-      playSingleTTS(text, processTtsQueue);
+      playSingleTTS(text, 'zh-CN', processTtsQueue);
+    }
+
+    function playSingleTTS(text, lang, onComplete) {
+      setAudioStatus(true);
+      const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
+      const url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=" + lang + "&client=tw-ob&q=" + encodeURIComponent(cleanText);
+      const audio = new Audio(url);
+      currentAudio = audio;
+
+      let hasFallback = false;
+      const triggerFallback = () => {
+        if (!hasFallback) {
+          hasFallback = true;
+          fallbackSpeechSynthesis(cleanText, lang, onComplete);
+        }
+      };
+
+      audio.onended = () => { 
+        currentAudio = null; 
+        if (onComplete) onComplete();
+      };
+      audio.onerror = () => { triggerFallback(); };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => { triggerFallback(); });
+      }
+    }
+
+    function fallbackSpeechSynthesis(text, lang, onComplete) {
+      try {
+        if (!('speechSynthesis' in window)) { 
+          setAudioStatus(false); 
+          if (onComplete) onComplete();
+          return; 
+        }
+        window.speechSynthesis.cancel();
+        
+        setTimeout(() => {
+          const ut = new SpeechSynthesisUtterance(text);
+          ut.lang = 'zh-CN';
+          ut.rate = 0.88;
+
+          let voices = window.speechSynthesis.getVoices();
+          const zhVoice = voices.find(v => 
+            (v.lang.toLowerCase().includes('zh') || v.lang.toLowerCase().includes('cmn')) && 
+            !v.lang.toLowerCase().includes('ja')
+          ) || voices.find(v => 
+            v.name.toLowerCase().includes('chinese') || 
+            v.name.toLowerCase().includes('国语') || 
+            v.name.toLowerCase().includes('普通话')
+          );
+
+          if (zhVoice) ut.voice = zhVoice;
+
+          ut.onend = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
+          ut.onerror = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
+          window.speechSynthesis.speak(ut);
+        }, 50);
+      } catch (e) {
+        setAudioStatus(false);
+        if (onComplete) onComplete();
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
