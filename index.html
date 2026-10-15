@@ -424,36 +424,70 @@
       playSingleTTS(text, 'zh-CN', processTtsQueue);
     }
 
+    function showAudioNotice(msg) {
+      let el = document.getElementById("audioNotice");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "audioNotice";
+        el.className = "fixed bottom-16 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[11px] px-3 py-1.5 rounded-full shadow-lg z-50 transition pointer-events-none";
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.style.opacity = "1";
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.opacity = "0"; }, 4000);
+    }
+
     function playSingleTTS(text, lang, onComplete) {
       setAudioStatus(true);
       const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
       const googleUrl = "https://translate.google.com/translate_tts?ie=UTF-8&tl=" + lang + "&client=tw-ob&q=" + encodeURIComponent(cleanText);
-      const youdaoUrl = "https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(cleanText) + "&le=zh";
+
+      if (currentAudio) {
+        try { currentAudio.pause(); currentAudio.currentTime = 0; } catch (e) {}
+        currentAudio = null;
+      }
 
       let audio = document.getElementById("globalAudio");
       if (!audio) {
         audio = new Audio();
+        audio.id = "globalAudio";
         audio.referrerPolicy = "no-referrer";
+        document.body.appendChild(audio);
       } else {
         audio.referrerPolicy = "no-referrer";
       }
       currentAudio = audio;
 
-      let stage = 0; // 0: Google, 1: Youdao, 2: SpeechSynthesis
-      const nextFallback = () => {
-        if (stage === 0) {
-          stage = 1;
-          // 第2候補: 有道辞書音声
-          audio.src = youdaoUrl;
-          const p = audio.play();
-          if (p !== undefined) {
-            p.catch(() => nextFallback());
-          }
-        } else if (stage === 1) {
-          stage = 2;
-          // 第3候補: 端末の中国語ボイス
+      let fallbackStarted = false;
+      const doFallback = (reason) => {
+        if (fallbackStarted) return;
+        fallbackStarted = true;
+        
+        // 第2候補: 有道辞書音声
+        const fallbackAudio = new Audio();
+        fallbackAudio.referrerPolicy = "no-referrer";
+        fallbackAudio.onended = () => {
+          currentAudio = null;
+          setAudioStatus(false);
+          if (onComplete) onComplete();
+        };
+        fallbackAudio.onerror = () => {
           currentAudio = null;
           fallbackSpeechSynthesis(cleanText, lang, onComplete);
+        };
+        fallbackAudio.src = "https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(cleanText) + "&le=zh";
+        const fp = fallbackAudio.play();
+        if (fp !== undefined) {
+          fp.catch((err) => {
+            if (err.name === "NotAllowedError") {
+              showAudioNotice("⚠️ 音声再生がブロックされています。アドレスバー左のアイコンから許可してください");
+              setAudioStatus(false);
+              if (onComplete) onComplete();
+            } else {
+              fallbackAudio.onerror();
+            }
+          });
         }
       };
 
@@ -463,14 +497,22 @@
         if (onComplete) onComplete();
       };
       audio.onerror = () => { 
-        nextFallback(); 
+        doFallback("audio.onerror"); 
       };
 
       // 第1候補: Google TTS（自然な音声）
       audio.src = googleUrl;
       const playPromise = audio.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => { nextFallback(); });
+        playPromise.catch((err) => { 
+          if (err.name === "NotAllowedError") {
+            showAudioNotice("⚠️ 音声再生がブロックされています。アドレスバー左のアイコンから許可してください");
+            setAudioStatus(false);
+            if (onComplete) onComplete();
+          } else {
+            doFallback("playPromise: " + err.name); 
+          }
+        });
       }
     }
 
