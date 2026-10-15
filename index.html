@@ -426,7 +426,8 @@
     function playSingleTTS(text, lang, onComplete) {
       setAudioStatus(true);
       const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
-      const url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=" + lang + "&client=tw-ob&q=" + encodeURIComponent(cleanText);
+      // 有道辞書の中国語ネイティブ音声 (Web公開/GitHub Pages環境でも遮断されず確実に再生)
+      const url = "https://dict.youdao.com/dictvoice?audio=" + encodeURIComponent(cleanText) + "&le=zh";
       const audio = new Audio(url);
       currentAudio = audio;
 
@@ -460,10 +461,6 @@
         window.speechSynthesis.cancel();
         
         setTimeout(() => {
-          const ut = new SpeechSynthesisUtterance(text);
-          ut.lang = 'zh-CN';
-          ut.rate = 0.88;
-
           let voices = window.speechSynthesis.getVoices();
           const zhVoice = voices.find(v => 
             (v.lang.toLowerCase().includes('zh') || v.lang.toLowerCase().includes('cmn')) && 
@@ -474,7 +471,18 @@
             v.name.toLowerCase().includes('普通话')
           );
 
-          if (zhVoice) ut.voice = zhVoice;
+          // 中国語ボイスがない端末で日本語ボイスで無理やり読まれるのを防止
+          if (!zhVoice) {
+            console.warn("端末に中国語音声エンジンがないため日本語での読み上げをスキップしました");
+            setAudioStatus(false);
+            if (onComplete) onComplete();
+            return;
+          }
+
+          const ut = new SpeechSynthesisUtterance(text);
+          ut.lang = 'zh-CN';
+          ut.voice = zhVoice;
+          ut.rate = 0.88;
 
           ut.onend = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
           ut.onerror = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
