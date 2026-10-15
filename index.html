@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HSK3級 完全制覇リーダー</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#d97706">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HSK3リーダー">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', 'Noto Sans SC', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f8fafc; }
+    .phrase-text { word-break: normal !important; overflow-wrap: normal !important; hyphens: none; word-spacing: 0.05em; }
+    .pinyin-text { letter-spacing: 0.02em; }
+    .phrase-card { width: 100% !important; min-width: 100% !important; flex: 1 1 100% !important; display: block !important; }
+    html { scroll-behavior: smooth; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    html, body { max-width: 100vw; overflow-x: hidden; margin: 0; padding: 0; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen pb-16 selection:bg-amber-100 selection:text-amber-900">
+
+  <header class="sticky top-0 z-50 h-[40px] bg-white/95 backdrop-blur border-b border-slate-200/80 px-2 flex items-center justify-between shadow-xs w-full box-border">
+    <div class="flex items-center space-x-1 flex-shrink-0 mr-2">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+      <h1 class="text-[11px] sm:text-xs font-bold text-slate-800 tracking-tight whitespace-nowrap">
+        ⚔ HSK3 全60景 PWA
+      </h1>
+    </div>
+    
+    <div class="flex items-center space-x-1 overflow-x-auto hide-scrollbar flex-1">
+      <button onclick="switchTab('genshin')" id="navTabBtn1" class="text-[10px] px-2 py-1 rounded bg-amber-500 text-white font-bold transition flex-shrink-0 whitespace-nowrap shadow-xs">
+        ⚔ 本編 (60)
+      </button>
+      <button onclick="switchTab('practical')" id="navTabBtn2" class="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium transition flex-shrink-0 whitespace-nowrap">
+        ⚡ 実務 (40)
+      </button>
+      <button onclick="switchTab('numbers')" id="navTabBtn3" class="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium transition flex-shrink-0 whitespace-nowrap">
+        🔢 数字特訓
+      </button>
+      <button onclick="switchTab('vocab')" id="navTabBtn4" class="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium transition flex-shrink-0 whitespace-nowrap">
+        📚 辞書 (<span id="totalVocabCountBadge">600</span>)
+      </button>
+    </div>
+    
+    <div id="ttsStatusBadge" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-[10px] shadow-inner flex-shrink-0 ml-1.5" title="音声ステータス">
+      <span id="playingIcon">🔊</span>
+    </div>
+  </header>
+
+  <main class="w-full max-w-[960px] mx-auto px-2 py-2.5 space-y-3 box-border">
+
+    <div id="page-genshin" class="space-y-2.5 w-full">
+      <div class="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-blue-500/10 border border-amber-300/70 rounded-lg p-2.5 flex items-center justify-between text-xs w-full shadow-2xs">
+        <div class="flex items-center gap-1.5 truncate">
+          <span class="text-amber-700 font-bold flex-shrink-0">📜 璃月物語：</span>
+          <span id="currentChapterTitle" class="text-slate-800 font-semibold truncate text-[12px]">第1章</span>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0 text-[10px]">
+          <span class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono font-bold">14〜17文字・SVO直解</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] hide-scrollbar w-full" id="chapterButtonsBar"></div>
+      <div id="storyContainer" class="space-y-3 w-full"></div>
+
+      <!-- ページ下部：次の章／前の章ナビゲーションボタン -->
+      <div class="pt-2 pb-6 flex items-center justify-between gap-3 border-t border-slate-200 mt-4">
+        <button id="btnPrevChapter" onclick="navigateChapter(-1)" class="flex-1 py-2.5 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:scale-95 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-40 disabled:pointer-events-none">
+          <span>⬅</span> 前の章へ
+        </button>
+        <button id="btnNextChapter" onclick="navigateChapter(1)" class="flex-1 py-2.5 px-3 rounded-lg border border-amber-500 bg-amber-500 text-white hover:bg-amber-600 active:scale-95 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-40 disabled:pointer-events-none">
+          次の章へ <span>➡</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="page-practical" class="space-y-3 hidden w-full">
+      <div class="bg-white rounded-xl border border-purple-200 p-3 sm:p-4 shadow-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-purple-100 mb-2.5">
+          <h3 class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+            <span>⚡</span> 準範囲外・実務キラー単語 40
+          </h3>
+          <span class="text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">タップで即発音</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]" id="practicalVocabGrid"></div>
+      </div>
+    </div>
+
+    <div id="page-numbers" class="space-y-3 hidden w-full">
+      <div class="bg-white rounded-xl border border-blue-200 p-3 sm:p-4 shadow-xs">
+        <div class="flex items-center justify-between pb-2 border-b border-blue-100 mb-2.5">
+          <h3 class="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+            <span>🔢</span> 0を挟む数字・発音特訓
+          </h3>
+          <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-medium">カードタップで再生</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="numbersGrid"></div>
+      </div>
+    </div>
+
+    <div id="page-vocab" class="space-y-3 hidden w-full">
+      <div class="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 mb-3">
+          <h3 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <span>📚</span> HSK1〜3級 600語完全合致辞書
+          </h3>
+          <div class="flex items-center gap-1 flex-wrap text-[10px]">
+            <button onclick="filterVocab('all')" id="btnFilterAll" class="px-2 py-0.5 rounded bg-slate-800 text-white font-medium">すべて (<span id="badgeCountAll">600</span>)</button>
+            <button onclick="filterVocab('hsk1')" id="btnFilterHsk1" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">1級 (<span id="badgeCountHsk1">150</span>)</button>
+            <button onclick="filterVocab('hsk2')" id="btnFilterHsk2" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">2級 (<span id="badgeCountHsk2">150</span>)</button>
+            <button onclick="filterVocab('hsk3')" id="btnFilterHsk3" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">3級 (<span id="badgeCountHsk3">300</span>)</button>
+          </div>
+        </div>
+        <input type="text" id="vocabSearchInput" oninput="handleVocabSearch()" placeholder="単語・ピンイン・日本語で検索..." class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg mb-3 focus:outline-none focus:border-amber-400 bg-slate-50">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]" id="allVocabContainer"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 1. 外部データファイルを読み込み -->
+  <script src="data.js"></script>
+
+  <!-- 2. アプリ本体の操作・オフライン音声ロジック -->
+  <script>
+    let currentChapter = 1;
+    let activeFilter = 'all';
+    let ttsQueue = [];
+    let isTtsPlaying = false;
+
+    // Service Worker 登録 (PWA & 完全オフライン化)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
+          .catch(err => console.log('ServiceWorker registration skipped/failed:', err));
+      });
+    }
+
+    function updateBadgeCounts() {
+      if (typeof allHskVocabulary === 'undefined') return;
+      const hsk1Count = allHskVocabulary.filter(v => v.level === 1).length;
+      const hsk2Count = allHskVocabulary.filter(v => v.level === 2).length;
+      const hsk3Count = allHskVocabulary.filter(v => v.level === 3).length;
+      const totalCount = allHskVocabulary.length;
+      const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      setTxt("totalVocabCountBadge", totalCount);
+      setTxt("badgeCountAll", totalCount);
+      setTxt("badgeCountHsk1", hsk1Count);
+      setTxt("badgeCountHsk2", hsk2Count);
+      setTxt("badgeCountHsk3", hsk3Count);
+    }
+
+    function renderChapterButtons() {
+      const bar = document.getElementById("chapterButtonsBar");
+      if (!bar || typeof storyChapters === 'undefined') return;
+      bar.innerHTML = storyChapters.map(ch => `
+        <button onclick="selectChapter(${ch.id})" id="chBtn_${ch.id}" class="px-2.5 py-1 rounded-md whitespace-nowrap transition flex items-center gap-1 border text-[10.5px] ${
+          ch.id === currentChapter
+            ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-xs'
+            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300'
+        }">
+          <span>第${ch.id}章</span>
+        </button>
+      `).join('');
+    }
+
+    function updateNavigationButtons() {
+      if (typeof storyChapters === 'undefined') return;
+      const prevBtn = document.getElementById("btnPrevChapter");
+      const nextBtn = document.getElementById("btnNextChapter");
+      const total = storyChapters.length;
+
+      if (prevBtn) {
+        prevBtn.disabled = currentChapter <= 1;
+      }
+      if (nextBtn) {
+        nextBtn.disabled = currentChapter >= total;
+      }
+    }
+
+    function navigateChapter(direction) {
+      if (typeof storyChapters === 'undefined') return;
+      const target = currentChapter + direction;
+      if (target >= 1 && target <= storyChapters.length) {
+        selectChapter(target);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function selectChapter(chId) {
+      currentChapter = chId;
+      renderChapterButtons();
+      renderCurrentChapter();
+      updateNavigationButtons();
+      const btn = document.getElementById(`chBtn_${chId}`);
+      if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+
+    function renderCurrentChapter() {
+      const container = document.getElementById("storyContainer");
+      const titleElem = document.getElementById("currentChapterTitle");
+      if (typeof storyChapters === 'undefined') return;
+      const chapter = storyChapters.find(c => c.id === currentChapter);
+      if (!container || !chapter) return;
+
+      if (titleElem) titleElem.textContent = chapter.title;
+
+      container.innerHTML = chapter.scenes.map(scene => `
+        <section class="bg-white rounded-xl border border-slate-200/90 p-2.5 sm:p-3.5 shadow-xs hover:border-amber-300 transition w-full box-border">
+          <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 mb-2">
+            <span class="text-[11px] font-bold text-amber-900">${scene.title}</span>
+            <button type="button" onclick="playSceneTTS(${scene.id})" class="text-[10px] sm:text-xs font-semibold text-blue-600 hover:text-blue-700 active:scale-95 flex items-center gap-1 bg-blue-50/70 px-2 py-0.5 rounded transition">
+              <span>全文再生</span> 🔊
+            </button>
+          </div>
+          <div class="flex flex-col gap-1.5 mb-2.5 w-full">
+            ${scene.phrases.map(p => `
+              <div onclick="speak('${p.cn.replace(/'/g, "\\'")}')" class="phrase-card cursor-pointer active:scale-[0.99] bg-slate-50 hover:bg-amber-50/60 border border-slate-200/70 hover:border-amber-300 rounded-lg p-2 sm:p-2.5 transition w-full box-border">
+                <div class="text-[10px] text-slate-400 pinyin-text font-mono">${p.py}</div>
+                <div class="phrase-text text-[13.5px] sm:text-base font-bold text-slate-950">${p.cn}</div>
+                <div class="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">${p.ja}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="bg-emerald-50/60 border border-emerald-200/70 rounded-lg p-2 text-xs text-emerald-950 flex items-start gap-1.5 w-full box-border">
+            <span class="text-emerald-700 font-bold flex-shrink-0 text-[10px] sm:text-xs">訳:</span>
+            <p class="leading-relaxed text-[11px] sm:text-xs">${scene.translation}</p>
+          </div>
+        </section>
+      `).join('');
+    }
+
+    function renderPracticalVocab() {
+      const grid = document.getElementById("practicalVocabGrid");
+      if (!grid || typeof practicalVocabulary === 'undefined') return;
+      grid.innerHTML = practicalVocabulary.map(item => `
+        <div onclick="speak('${item.word}')" class="cursor-pointer active:scale-95 bg-purple-50/50 hover:bg-purple-100/70 border border-purple-200/80 rounded-lg p-2 transition flex flex-col justify-between">
+          <div>
+            <div class="font-bold text-slate-900 text-xs">${item.word}</div>
+            <div class="text-[9px] text-purple-700 font-mono mt-0.5">${item.pinyin}</div>
+          </div>
+          <div class="text-[10px] text-slate-600 mt-1 leading-snug border-t border-purple-100 pt-1">${item.ja}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderNumbers() {
+      const grid = document.getElementById("numbersGrid");
+      if (!grid || typeof numbersData === 'undefined') return;
+      grid.innerHTML = numbersData.map(item => `
+        <div onclick="speak('${item.num} ${item.example}')" class="cursor-pointer active:scale-98 bg-slate-50 hover:bg-blue-50 border border-blue-200 rounded-lg p-2.5 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base font-black text-blue-900 font-mono">${item.num}</span>
+            <span class="text-xs text-blue-700 font-mono font-medium">${item.pinyin}</span>
+          </div>
+          <p class="text-[11px] text-slate-600 mt-1 leading-snug">${item.rule}</p>
+          <div class="text-[10px] text-slate-500 font-medium mt-1 bg-white px-2 py-0.5 rounded border border-slate-200/60 flex items-center justify-between">
+            <span>例文: ${item.example}</span>
+            <span>🔊</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAllVocab(list = allHskVocabulary) {
+      const container = document.getElementById("allVocabContainer");
+      if (!container || typeof allHskVocabulary === 'undefined') return;
+      container.innerHTML = list.map(item => `
+        <div onclick="speak('${item.word}')" class="cursor-pointer active:scale-95 bg-slate-50 hover:bg-amber-50 border border-slate-200/80 hover:border-amber-300 rounded-lg p-1.5 transition flex flex-col justify-between overflow-hidden">
+          <div class="flex items-start justify-between gap-1">
+            <span class="font-bold text-slate-900 text-xs truncate">${item.word}</span>
+            <span class="text-[9px] px-1 rounded ${
+              item.level === 1 ? 'bg-emerald-100 text-emerald-800' :
+              item.level === 2 ? 'bg-blue-100 text-blue-800' :
+              'bg-amber-100 text-amber-800'
+            } font-mono flex-shrink-0">H${item.level}</span>
+          </div>
+          <div class="text-[9px] text-slate-400 font-mono truncate">${item.pinyin}</div>
+          <div class="text-[10px] text-slate-600 border-t border-slate-200/60 pt-0.5 mt-0.5 truncate">${item.ja}</div>
+        </div>
+      `).join('');
+    }
+
+    function filterVocab(type) {
+      if (typeof allHskVocabulary === 'undefined') return;
+      activeFilter = type;
+      const bAll = document.getElementById("btnFilterAll");
+      const b1 = document.getElementById("btnFilterHsk1");
+      const b2 = document.getElementById("btnFilterHsk2");
+      const b3 = document.getElementById("btnFilterHsk3");
+      [bAll, b1, b2, b3].forEach(b => { if (b) b.className = "px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium"; });
+
+      let filtered = allHskVocabulary;
+      if (type === 'hsk1') {
+        if (b1) b1.className = "px-2 py-0.5 rounded bg-emerald-600 text-white font-medium";
+        filtered = allHskVocabulary.filter(v => v.level === 1);
+      } else if (type === 'hsk2') {
+        if (b2) b2.className = "px-2 py-0.5 rounded bg-blue-600 text-white font-medium";
+        filtered = allHskVocabulary.filter(v => v.level === 2);
+      } else if (type === 'hsk3') {
+        if (b3) b3.className = "px-2 py-0.5 rounded bg-amber-600 text-white font-medium";
+        filtered = allHskVocabulary.filter(v => v.level === 3);
+      } else {
+        if (bAll) bAll.className = "px-2 py-0.5 rounded bg-slate-800 text-white font-medium";
+      }
+      renderAllVocab(filtered);
+    }
+
+    function handleVocabSearch() {
+      if (typeof allHskVocabulary === 'undefined') return;
+      const q = document.getElementById("vocabSearchInput").value.trim().toLowerCase();
+      let base = allHskVocabulary;
+      if (activeFilter === 'hsk1') base = base.filter(v => v.level === 1);
+      if (activeFilter === 'hsk2') base = base.filter(v => v.level === 2);
+      if (activeFilter === 'hsk3') base = base.filter(v => v.level === 3);
+
+      if (!q) { renderAllVocab(base); return; }
+      const filtered = base.filter(v => 
+        v.word.toLowerCase().includes(q) ||
+        v.pinyin.toLowerCase().includes(q) ||
+        v.ja.toLowerCase().includes(q)
+      );
+      renderAllVocab(filtered);
+    }
+
+    function switchTab(tabId) {
+      const pGenshin = document.getElementById("page-genshin");
+      const pPractical = document.getElementById("page-practical");
+      const pNumbers = document.getElementById("page-numbers");
+      const pVocab = document.getElementById("page-vocab");
+      const b1 = document.getElementById("navTabBtn1");
+      const b2 = document.getElementById("navTabBtn2");
+      const b3 = document.getElementById("navTabBtn3");
+      const b4 = document.getElementById("navTabBtn4");
+
+      [pGenshin, pPractical, pNumbers, pVocab].forEach(p => { if (p) p.classList.add('hidden'); });
+      [b1, b2, b3, b4].forEach(b => {
+        if (b) b.className = "text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium transition flex-shrink-0 whitespace-nowrap";
+      });
+
+      if (tabId === 'genshin') {
+        pGenshin.classList.remove('hidden');
+        if (b1) b1.className = "text-[10px] px-2 py-1 rounded bg-amber-500 text-white font-bold transition flex-shrink-0 whitespace-nowrap shadow-xs";
+      } else if (tabId === 'practical') {
+        pPractical.classList.remove('hidden');
+        if (b2) b2.className = "text-[10px] px-2 py-1 rounded bg-purple-600 text-white font-bold transition flex-shrink-0 whitespace-nowrap shadow-xs";
+      } else if (tabId === 'numbers') {
+        pNumbers.classList.remove('hidden');
+        if (b3) b3.className = "text-[10px] px-2 py-1 rounded bg-blue-600 text-white font-bold transition flex-shrink-0 whitespace-nowrap shadow-xs";
+      } else if (tabId === 'vocab') {
+        pVocab.classList.remove('hidden');
+        if (b4) b4.className = "text-[10px] px-2 py-1 rounded bg-emerald-600 text-white font-bold transition flex-shrink-0 whitespace-nowrap shadow-xs";
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setAudioStatus(isPlaying) {
+      isTtsPlaying = isPlaying;
+      const icon = document.getElementById("playingIcon");
+      const badge = document.getElementById("ttsStatusBadge");
+      if (icon) icon.textContent = isPlaying ? "⏳" : "🔊";
+      if (badge) {
+        badge.className = isPlaying
+          ? "w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-[10px] animate-pulse flex-shrink-0 ml-1.5"
+          : "w-6 h-6 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-[10px] shadow-inner flex-shrink-0 ml-1.5";
+      }
+    }
+
+    // オンライン時は Google TTS（中国語ネイティブ音声）、失敗時は端末の音声合成にフォールバック
+    let currentAudio = null;
+
+    function speak(text) {
+      if (!text) return;
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+      ttsQueue = [];
+      playSingleTTS(text, () => setAudioStatus(false));
+    }
+
+    function playSingleTTS(text, onComplete) {
+      setAudioStatus(true);
+      const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
+      const url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-CN&client=tw-ob&q=" + encodeURIComponent(cleanText);
+      const audio = new Audio(url);
+      currentAudio = audio;
+
+      let hasFallback = false;
+      const triggerFallback = () => {
+        if (!hasFallback) {
+          hasFallback = true;
+          currentAudio = null;
+          playSpeechSynthesis(cleanText, onComplete);
+        }
+      };
+
+      audio.onended = () => {
+        currentAudio = null;
+        if (onComplete) onComplete();
+      };
+      audio.onerror = () => { triggerFallback(); };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => { triggerFallback(); });
+      }
+    }
+
+    function playSceneTTS(sceneId) {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+      if (typeof storyChapters === 'undefined') return;
+      const chapter = storyChapters.find(c => c.id === currentChapter);
+      if (!chapter) return;
+      const scene = chapter.scenes.find(s => s.id === sceneId);
+      if (!scene) return;
+
+      const fullText = scene.phrases.map(p => p.cn).join(" ");
+      const chunks = fullText.split(/([。！？；]+)/).filter(Boolean);
+      ttsQueue = [];
+      
+      let temp = "";
+      for (let i = 0; i < chunks.length; i++) {
+        temp += chunks[i];
+        if (chunks[i].match(/[。！？；]+/) || i === chunks.length - 1) {
+          if (temp.trim()) ttsQueue.push(temp.trim());
+          temp = "";
+        }
+      }
+      processTtsQueue();
+    }
+
+    function processTtsQueue() {
+      if (ttsQueue.length === 0) {
+        setAudioStatus(false);
+        return;
+      }
+      const text = ttsQueue.shift();
+      playSingleTTS(text, processTtsQueue);
+    }
+
+    function playSpeechSynthesis(text, onComplete) {
+      if (!('speechSynthesis' in window)) {
+        if (onComplete) onComplete();
+        return;
+      }
+      setAudioStatus(true);
+      const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
+      const ut = new SpeechSynthesisUtterance(cleanText);
+      ut.lang = 'zh-CN';
+      ut.rate = 0.9;
+
+      let voices = window.speechSynthesis.getVoices();
+      const zhVoice = voices.find(v => 
+        (v.lang.toLowerCase().includes('zh') || v.lang.toLowerCase().includes('cmn')) && 
+        !v.lang.toLowerCase().includes('ja')
+      ) || voices.find(v => 
+        v.name.toLowerCase().includes('chinese') || 
+        v.name.toLowerCase().includes('国语') || 
+        v.name.toLowerCase().includes('普通话')
+      );
+      if (zhVoice) ut.voice = zhVoice;
+
+      ut.onend = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
+      ut.onerror = () => { if (onComplete) onComplete(); else setAudioStatus(false); };
+      
+      window.speechSynthesis.speak(ut);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+        window.speechSynthesis.getVoices();
+      }
+
+      updateBadgeCounts();
+      renderChapterButtons();
+      renderCurrentChapter();
+      updateNavigationButtons();
+      renderPracticalVocab();
+      renderNumbers();
+      renderAllVocab();
+      
+      document.getElementById("page-genshin").classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>
